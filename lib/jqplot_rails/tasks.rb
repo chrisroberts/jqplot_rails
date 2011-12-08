@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'jqplot_rails/version'
 
 namespace :jqplot_rails do
 
