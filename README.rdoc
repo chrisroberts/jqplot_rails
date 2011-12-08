@@ -1,0 +1,1 @@
+Build jqplots from the comfort of rails
