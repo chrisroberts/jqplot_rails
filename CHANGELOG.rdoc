@@ -1,3 +1,7 @@
+== v0.0.3
+* DRY up implementation
+* Provide #jqplot_data_onclick helper for onclick events on plot data
+
 == v0.0.2
 * require version into tasks
 
