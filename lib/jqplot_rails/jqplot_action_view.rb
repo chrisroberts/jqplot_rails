@@ -13,13 +13,23 @@ module JqPlotRails
     def jqplot(dom_id, data, opts={})
       output = jqplot_setup
       output << "window._jqplot_rails['#{_j_key(dom_id)}'] = jQuery.jqplot('#{_j_key(dom_id)}', #{format_type_to_js(data)}, #{format_type_to_js(opts)});".html_safe
-      if(opts.delete(:raw))
-        output
-      else
-        javascript_tag do
-          output
-        end
+      _j_wrap(opts[:raw], output)
+    end
+
+    # dom_id:: DOM ID used for the plot
+    # opts:: Ooptions hash for building plot binding
+    #   - :function -> RawJS instance with full function defined
+    #   - :link_to -> {:url, :remote}
+    # Bind to click event on data and make request
+    def jqplot_data_onclick(dom_id, opts={})
+      output = jqplot_setup
+      raise 'Only :function or :link_to may be defined, not both.' if opts[:function].present? && opts[:link_to].present?
+      raise 'Must provide :function or :link_to for event.' if opts[:function].blank? && opts[:link_to].blank?
+      function = opts[:link_to].present? ? _j_build_click_url_event(dom_id, opts[:link_to]) : opts[:function]
+      output << jqplot_exists(dom_id) do
+        "jQuery(#{format_type_to_js(format_id(dom_id))}).bind('jqplotDataClick', #{format_type_to_js(function)});".html_safe
       end
+      _j_wrap(opts[:raw], output)
     end
 
     # dom_id:: DOM ID used for the plot
@@ -31,13 +41,7 @@ module JqPlotRails
       output << jqplot_exists(dom_id) do
         "#{jqplot_instance(dom_id)}.replot({clear:true,resetAxes:true});"
       end
-      if(args.include?(:raw))
-        output.html_safe
-      else
-        javascript_tag do
-          output.html_safe
-        end
-      end
+      _j_wrap(args.include?(:raw), output)
     end
 
     # text:: Button text
@@ -68,21 +72,18 @@ module JqPlotRails
         "jQuery(#{format_type_to_js(format_id(dom_id))}).resizable(#{format_type_to_js(resize_args)});" +
         "jQuery(#{format_type_to_js(format_id(dom_id))}).bind('resize', function(event,ui){ #{jqplot_instance(dom_id)}.replot(); });"
       end
-      if(args.include?(:raw))
-        output.html_safe
-      else
-        javascript_tag{ output.html_safe }
-      end
+      _j_wrap(args.include?(:raw), output)
     end
 
     private
-
+  
+    # Setups up environment for plots (creates storage area)
     def jqplot_setup
       output = ''
       unless(@_jqplot_setup)
         output << 'if(window._jqplot_rails == undefined){ window._jqplot_rails = {}; }'
       end
-      output
+      output.html_safe
     end
 
     # dom_id:: DOM ID used for the plot
@@ -94,11 +95,44 @@ module JqPlotRails
     # dom_id:: DOM ID used for the plot
     # Returns the plot instance
     def jqplot_instance(dom_id)
-      "window._jqplot_rails['#{_j_key(dom_id)}']"
+      "window._jqplot_rails['#{_j_key(dom_id)}']".html_safe
     end
 
+    # key:: DOM ID for plot
+    # Helper to remove hash prefix if found
     def _j_key(key)
-      key.sub('#', '')
+      key.sub('#', '').html_safe
+    end
+
+    # raw:: Boolean. Raw or wrapped string
+    # string:: Javascript string
+    # Helper to wrap javascript within tag if required
+    def _j_wrap(raw, string)
+      raw ? string.html_safe : javascript_tag{ string.html_safe }
+    end
+
+    # opts:: Hash
+    #   - :url -> Path or symbole
+    #   - :use_ticks -> Map index to tick name and pass tick name instead (true defaults to x-axis or :x/:y)
+    #   - :remote -> Boolean for ajax call
+    #   - :args -> extra arguments for url building
+    def _j_build_click_url_event(dom_id, opts={})
+      output = 'function(ev, seriesIndex, pointIndex, data){'
+      index = opts[:use_ticks] ? "#{jqplot_instance(dom_id)}.axes.#{opts[:use_ticks] == :y ? 'y' : 'x'}axis.ticks[data[0] - 1]" : "data[0]"
+      if(opts[:url].is_a?(Symbol))
+        args = ['000']
+        args += opts[:args] if opts[:args].present?
+        url = RawJS.new("'#{Rails.application.routes.url_helpers.send(opts[:url].to_s.sub('_url', '_path').to_sym, *args)}'.replace('000', #{index})")
+      else
+        url = RawJS.new("'#{opts[:url]}#{opts[:url].include?('?') ? '&' : '?'}jqplot_id='+#{index}")
+      end
+      if(opts[:remote])
+        output << "jQuery.get(#{format_type_to_js(url)}, null, 'script');"
+      else
+        output << "window.location = #{format_type_to_js(url)};"
+      end
+      output << '}'
+      output.html_safe
     end
   end
 end
