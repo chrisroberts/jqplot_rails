@@ -1,1 +1,18 @@
 Build jqplots from the comfort of rails
+
+Example:
+
+  # app/controller/plots_controller.rb
+  before_filter do
+    JqPlotRails::JqPlot.enable
+  end
+
+  # app/views/layouts/application.html.haml
+  ...
+  = stylesheet_link_expansion :jqplot_rails
+
+  # app/view/plots/myplot.html.haml
+  %div{:id => :myplot}
+  = jqplot('myplot', @data, :animate => true)
+
+
