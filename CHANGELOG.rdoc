@@ -1,3 +1,6 @@
+== v0.0.4
+* Make asset loading on-demand
+
 == v0.0.3
 * DRY up implementation
 * Provide #jqplot_data_onclick helper for onclick events on plot data
